@@ -42,6 +42,9 @@ class LightBulbState:
 
 	def process_command(self, param, value):
 		try:
+			if (param == 'toggle'):
+				_LOGGER.info("Toggling bulb state: " + self.name)
+				self.yeelight.toggle()
 			if (param == 'status'):
 				if (value == "on"):
 					_LOGGER.info("Turning on bulb: " + self.name)

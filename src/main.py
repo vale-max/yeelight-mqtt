@@ -10,7 +10,7 @@ from lightbulbstate import LightBulbState
 import mqtt
 import yamlparser
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 _LOGGER = logging.getLogger(__name__)
 QUERY_TIME = 2
 
@@ -50,21 +50,30 @@ def wait():
 			break
 		time.sleep(QUERY_TIME/10)
 
-def process_lamp_states(client):
+def process_lamp_states(client,firstcall=0):
 	global bulbs
+	_LOGGER.debug("firstcall value " + str(firstcall))
+	if (firstcall == 1):
+		for bulb in bulbs:
+			bulb.update_properties(force=True)
+			_LOGGER.info("!!!! Update at startup " + bulb.name)
+			data = {'status':bulb.status, 'ct':bulb.color_temperature, 'bright':bulb.bright, 'rgb':bulb.rgb}
+			client.publish(bulb.model, bulb.name, data)
+		return()
 	while True:
 		wait();
 		try:
 			for bulb in bulbs:
-				hashold = bulb.hash()
+				hashold = str(bulb.hash())
 				bulb.update_properties(force=True)
-				hashnew = bulb.hash()
-				# _LOGGER.debug(str(bulb.name) + " ===> " + hashold + "-" + hashnew)
+				hashnew = str(bulb.hash())
+				_LOGGER.debug(str(bulb.name) + " ===> " + hashold + "-" + hashnew)
 
 				if (hashold != hashnew):
 					_LOGGER.info("!!!! " + bulb.name + ":" + hashold + "->" + hashnew)
 					data = {'status':bulb.status, 'ct':bulb.color_temperature, 'bright':bulb.bright, 'rgb':bulb.rgb}
 					client.publish(bulb.model, bulb.name, data)
+
 		except Exception as e:
 			_LOGGER.error('Error while sending from gateway to mqtt: ', str(e))
 
@@ -99,7 +108,9 @@ if __name__ == "__main__":
 	client.subscribe("light", "+", "+", "set")
 	
 	bulbs = init_lamps(config)
-
+	_LOGGER.info("Send startup message.")
+	process_lamp_states(client,1)
+	
 	t1 = threading.Thread(target=process_lamp_states, args=[client])
 	t1.daemon = True
 	t1.start()
